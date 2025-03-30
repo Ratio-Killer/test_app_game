@@ -4,19 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\GameRequest;
 use App\Models\Game;
+use App\Helpers\FileHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class GameController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * @param Request $request
      * @return View
      */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $games = Game::all();
+        $filters = $request->only(['title', 'genre', 'platform']);
+        $games = Game::query()->applyFilters($filters)->paginate(15);
+
         return view('games.index', compact('games'));
     }
 
@@ -26,7 +30,7 @@ class GameController extends Controller
      */
     public function create(): View
     {
-        return view('games.create',);
+        return view('games.create');
     }
 
     /**
@@ -35,13 +39,7 @@ class GameController extends Controller
     public function store(GameRequest $request): JsonResponse
     {
         $data = $request->validated();
-
-        if ($request->hasFile('cover')) {
-            $coverPath = $request->file('cover')->store('covers', 'public');
-            $data['cover'] = json_encode(['path' => $coverPath]);
-        } else {
-            $data['cover'] = json_encode([]);
-        }
+        $data['cover'] = FileHelper::uploadCover($request->file('cover'));
         Game::create($data);
 
         return response()->json(['success' => true]);
@@ -52,7 +50,7 @@ class GameController extends Controller
      * @param Game $game
      * @return View
      */
-    public function show(Game $game):View
+    public function show(Game $game): View
     {
         return view('games.show', compact('game'));
     }
@@ -71,11 +69,7 @@ class GameController extends Controller
     public function update(GameRequest $request, Game $game): RedirectResponse
     {
         $data = $request->validated();
-
-        if ($request->hasFile('cover')) {
-            $path = $request->file('cover')->store('covers', 'public');
-            $data['cover'] = json_encode(['path' => $path]);
-        }
+        $data['cover'] = FileHelper::uploadCover($request->file('cover'));
         $game->update($data);
 
         return redirect()->route('games.index')->with('success', 'The game has been updated successfully.');
@@ -87,6 +81,7 @@ class GameController extends Controller
     public function destroy(Game $game): RedirectResponse
     {
         $game->delete();
+
         return redirect()->route('games.index')->with('success', 'Game deleted successfully.');
     }
 }
